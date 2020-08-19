@@ -191,6 +191,61 @@ struct rentbw_tester : eosio_system_tester
       return config;
    }
 
+   int64_t calc_rentbw_fee(const rentbw_state_resource& state, int64_t utilization_increase) {
+      if( utilization_increase <= 0 ) return 0;
+
+      // Let p(u) = price as a function of the utilization fraction u which is defined for u in [0.0, 1.0].
+      // Let f(u) = integral of the price function p(x) from x = 0.0 to x = u, again defined for u in [0.0, 1.0].
+
+      // In particular we choose f(u) = min_price * u + ((max_price - min_price) / exponent) * (u ^ exponent).
+      // And so p(u) = min_price + (max_price - min_price) * (u ^ (exponent - 1.0)).
+
+      // Returns f(double(end_utilization)/state.weight) - f(double(start_utilization)/state.weight) which is equivalent to
+      // the integral of p(x) from x = double(start_utilization)/state.weight to x = double(end_utilization)/state.weight.
+      // @pre 0 <= start_utilization <= end_utilization <= state.weight
+      auto price_integral_delta = [&state](int64_t start_utilization, int64_t end_utilization) -> double {
+         double coefficient = (state.max_price.get_amount() - state.min_price.get_amount()) / state.exponent;
+         double start_u     = double(start_utilization) / state.weight;
+         double end_u       = double(end_utilization) / state.weight;
+         return state.min_price.get_amount() * end_u - state.min_price.get_amount() * start_u +
+                  coefficient * std::pow(end_u, state.exponent) - coefficient * std::pow(start_u, state.exponent);
+      };
+
+      // Returns p(double(utilization)/state.weight).
+      // @pre 0 <= utilization <= state.weight
+      auto price_function = [&state](int64_t utilization) -> double {
+         double price = state.min_price.get_amount();
+         // state.exponent >= 1.0, therefore the exponent passed into std::pow is >= 0.0.
+         // Since the exponent passed into std::pow could be 0.0 and simultaneously so could double(utilization)/state.weight,
+         // the safest thing to do is handle that as a special case explicitly rather than relying on std::pow to return 1.0
+         // instead of triggering a domain error.
+         double new_exponent = state.exponent - 1.0;
+         if (new_exponent <= 0.0) {
+            return state.max_price.get_amount();
+         } else {
+            price += (state.max_price.get_amount() - state.min_price.get_amount()) * std::pow(double(utilization) / state.weight, new_exponent);
+         }
+
+         return price;
+      };
+
+      double  fee = 0.0;
+      int64_t start_utilization = state.utilization;
+      int64_t end_utilization   = start_utilization + utilization_increase;
+
+      if (start_utilization < state.adjusted_utilization) {
+         fee += price_function(state.adjusted_utilization) *
+                  std::min(utilization_increase, state.adjusted_utilization - start_utilization) / state.weight;
+         start_utilization = state.adjusted_utilization;
+      }
+
+      if (start_utilization < end_utilization) {
+         fee += price_integral_delta(start_utilization, end_utilization);
+      }
+
+      return std::ceil(fee);
+   }
+
    action_result configbw(const rentbw_config &config)
    {
       // Verbose solution needed to work around bug in abi_serializer that fails if optional values aren't explicitly
@@ -255,14 +310,20 @@ struct rentbw_tester : eosio_system_tester
       auto before_receiver = get_account_info(receiver);
       auto before_reserve = get_account_info(N(eosio.reserv));
       auto before_state = get_state();
+      // fees
+      auto net_util = __int128_t(net_frac) * before_state.net.weight / rentbw_frac;
+      auto net_fee = calc_rentbw_fee(before_state.net, net_util);
+      auto cpu_util = __int128_t(cpu_frac) * before_state.cpu.weight / rentbw_frac;
+      auto cpu_fee = calc_rentbw_fee(before_state.cpu, cpu_util);
       BOOST_REQUIRE_EQUAL("", rentbw(payer, receiver, days, net_frac, cpu_frac, asset::from_string("300000.0000 TST")));
       auto after_payer = get_account_info(payer);
       auto after_receiver = get_account_info(receiver);
       auto after_reserve = get_account_info(N(eosio.reserv));
       auto after_state = get_state();
-
+      
       if (GENERATE_CSV)
       {
+
          ilog("before_state.net.assumed_stake_weight:    ${x}", ("x", before_state.net.assumed_stake_weight));
          ilog("before_state.net.weight_ratio:            ${x}",
               ("x", before_state.net.weight_ratio / double(rentbw_frac)));
@@ -274,7 +335,8 @@ struct rentbw_tester : eosio_system_tester
          ilog("after_receiver.net - before_receiver.net: ${x}", ("x", after_receiver.net - before_receiver.net));
          ilog("expected_net:                             ${x}", ("x", expected_net));
          ilog("before_payer.liquid - after_payer.liquid: ${x}", ("x", before_payer.liquid - after_payer.liquid));
-         ilog("expected_fee:                             ${x}", ("x", expected_fee));
+         ilog("expected_net_fee:                         ${x}", ("x", net_fee));
+         ilog("expected_cpu_fee:                         ${x}", ("x", cpu_fee));
 
          ilog("before_reserve.net:                       ${x}", ("x", before_reserve.net));
          ilog("after_reserve.net:                        ${x}", ("x", after_reserve.net));
