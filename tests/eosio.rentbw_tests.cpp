@@ -10,6 +10,7 @@
 #include <iostream>
 #include <sstream>
 #include <fstream>
+#include <random>
 
 #include "eosio.system_tester.hpp"
 #include "csvwriter.hpp"
@@ -17,8 +18,9 @@
 #define GENERATE_CSV true
 #define CSV_FILENAME "model_tests.csv"
 
-inline constexpr int64_t rentbw_frac = 1'000'000'000'000'000ll; // 1.0 = 10^15
-inline constexpr int64_t stake_weight = 100'000'000'0000ll;     // 10^12
+inline constexpr int64_t rentbw_frac = 1'000'000'000'000'000ll;  // 1.0 = 10^15
+inline constexpr int64_t endstate_weight_ratio = 10000000000000ll;     // 0.1 = 10^13
+inline constexpr int64_t stake_weight  = 1000000000000ll;     // 0.01 = 10^12
 
 struct rentbw_config_resource
 {
@@ -102,7 +104,7 @@ struct rentbw_tester : eosio_system_tester
                          << "after_reserve.net"
                          << "before_reserve.cpu"
                          << "after_reserve.cpu"
-
+                         << "after_receiver.cpu-before_receiver.cpu"
                          << "weight"
                          << "weight_ratio"
                          << "assumed_stake_weight"
@@ -191,6 +193,18 @@ struct rentbw_tester : eosio_system_tester
       return config;
    }
 
+   asset calc_total_fee(const rentbw_state& state, int64_t net_frac, int64_t cpu_frac) 
+   {
+      auto net_util = __int128_t(net_frac) * state.net.weight / rentbw_frac;
+      auto net_fee = calc_rentbw_fee(state.net, net_util);
+      auto cpu_util = __int128_t(cpu_frac) * state.cpu.weight / rentbw_frac;
+      auto cpu_fee = calc_rentbw_fee(state.cpu, cpu_util);
+      
+      ilog("net_fee: ${net_fee} cpu_fee: ${cpu_fee}",("net_fee",net_fee)("cpu_fee",cpu_fee));
+      auto fee = asset(net_fee + cpu_fee, symbol{CORE_SYM});
+      return fee;
+   }
+
    int64_t calc_rentbw_fee(const rentbw_state_resource& state, int64_t utilization_increase) {
       if( utilization_increase <= 0 ) return 0;
 
@@ -261,7 +275,7 @@ struct rentbw_tester : eosio_system_tester
 
       auto conf = mvo("net", resource_conf_vo(config.net))("cpu", resource_conf_vo(config.cpu))("rent_days", optional_to_variant(config.rent_days))("min_rent_fee", optional_to_variant(config.min_rent_fee));
 
-      //idump((fc::json::to_pretty_string(conf)));
+      // idump((fc::json::to_pretty_string(conf)));
       return push_action(config::system_account_name, N(configrentbw), mvo()("args", std::move(conf)));
 
       // If abi_serializer worked correctly, the following is all that would be needed:
@@ -315,7 +329,7 @@ struct rentbw_tester : eosio_system_tester
       auto net_fee = calc_rentbw_fee(before_state.net, net_util);
       auto cpu_util = __int128_t(cpu_frac) * before_state.cpu.weight / rentbw_frac;
       auto cpu_fee = calc_rentbw_fee(before_state.cpu, cpu_util);
-      BOOST_REQUIRE_EQUAL("", rentbw(payer, receiver, days, net_frac, cpu_frac, asset::from_string("300000.0000 TST")));
+      BOOST_REQUIRE_EQUAL("", rentbw(payer, receiver, days, net_frac, cpu_frac, expected_fee));
       auto after_payer = get_account_info(payer);
       auto after_receiver = get_account_info(receiver);
       auto after_reserve = get_account_info(N(eosio.reserv));
@@ -335,6 +349,7 @@ struct rentbw_tester : eosio_system_tester
          ilog("after_receiver.net - before_receiver.net: ${x}", ("x", after_receiver.net - before_receiver.net));
          ilog("expected_net:                             ${x}", ("x", expected_net));
          ilog("before_payer.liquid - after_payer.liquid: ${x}", ("x", before_payer.liquid - after_payer.liquid));
+         ilog("fee:                                      ${x}", ("x", expected_fee));
          ilog("expected_net_fee:                         ${x}", ("x", net_fee));
          ilog("expected_cpu_fee:                         ${x}", ("x", cpu_fee));
 
@@ -350,12 +365,12 @@ struct rentbw_tester : eosio_system_tester
                       << before_receiver.net
                       << after_receiver.net
                       << after_receiver.net - before_receiver.net
-                      << before_payer.liquid - after_payer.liquid
+                      << (before_payer.liquid - after_payer.liquid).get_amount()
                       << before_reserve.net
                       << after_reserve.net
                       << before_reserve.cpu
                       << after_reserve.cpu
-
+                      << after_receiver.cpu - before_receiver.cpu
                       << get_state().cpu.weight
                       << get_state().cpu.weight_ratio
                       << get_state().cpu.assumed_stake_weight
@@ -388,6 +403,92 @@ struct rentbw_tester : eosio_system_tester
       BOOST_REQUIRE_EQUAL(before_reserve.cpu - after_reserve.cpu, expected_cpu);
       BOOST_REQUIRE_EQUAL(after_state.net.utilization - before_state.net.utilization, expected_net);
       BOOST_REQUIRE_EQUAL(after_state.cpu.utilization - before_state.cpu.utilization, expected_cpu);
+   }
+
+   void nocheck_rentbw(const name &payer, const name &receiver, uint32_t days, int64_t net_frac, int64_t cpu_frac, asset expected_fee)
+   {
+      auto before_payer = get_account_info(payer);
+      auto before_receiver = get_account_info(receiver);
+      auto before_reserve = get_account_info(N(eosio.reserv));
+      auto before_state = get_state();
+      // fees
+      auto net_util = __int128_t(net_frac) * before_state.net.weight / rentbw_frac;
+      auto net_fee = calc_rentbw_fee(before_state.net, net_util);
+      auto cpu_util = __int128_t(cpu_frac) * before_state.cpu.weight / rentbw_frac;
+      auto cpu_fee = calc_rentbw_fee(before_state.cpu, cpu_util);
+      BOOST_REQUIRE_EQUAL("", rentbw(payer, receiver, days, net_frac, cpu_frac, expected_fee));
+      auto after_payer = get_account_info(payer);
+      auto after_receiver = get_account_info(receiver);
+      auto after_reserve = get_account_info(N(eosio.reserv));
+      auto after_state = get_state();
+      
+      if (GENERATE_CSV)
+      {
+
+         ilog("before_state.net.assumed_stake_weight:    ${x}", ("x", before_state.net.assumed_stake_weight));
+         ilog("before_state.net.weight_ratio:            ${x}",
+              ("x", before_state.net.weight_ratio / double(rentbw_frac)));
+         ilog("before_state.net.assumed_stake_weight:    ${x}", ("x", before_state.net.assumed_stake_weight));
+         ilog("before_state.net.weight:                  ${x}", ("x", before_state.net.weight));
+
+         ilog("before_receiver.net:                      ${x}", ("x", before_receiver.net));
+         ilog("after_receiver.net:                       ${x}", ("x", after_receiver.net));
+         ilog("after_receiver.net - before_receiver.net: ${x}", ("x", after_receiver.net - before_receiver.net));
+         // ilog("expected_net:                             ${x}", ("x", expected_net));
+         ilog("before_payer.liquid - after_payer.liquid: ${x}", ("x", before_payer.liquid - after_payer.liquid));
+         ilog("fee:                                      ${x}", ("x", expected_fee));
+         ilog("expected_net_fee:                         ${x}", ("x", net_fee));
+         ilog("expected_cpu_fee:                         ${x}", ("x", cpu_fee));
+         ilog("before_reserve.net:                       ${x}", ("x", before_reserve.net));
+         ilog("after_reserve.net:                        ${x}", ("x", after_reserve.net));
+         ilog("before_reserve.cpu:                       ${x}", ("x", before_reserve.cpu));
+         ilog("after_reserve.cpu:                        ${x}", ("x", after_reserve.cpu));
+
+         csv.newRow() << last_block_time()
+                      << before_state.net.assumed_stake_weight
+                      << before_state.net.weight_ratio / double(rentbw_frac)
+                      << before_state.net.weight
+                      << before_receiver.net
+                      << after_receiver.net
+                      << after_receiver.net - before_receiver.net
+                      << (before_payer.liquid - after_payer.liquid).get_amount()
+                      << before_reserve.net
+                      << after_reserve.net
+                      << before_reserve.cpu
+                      << after_reserve.cpu
+                      << after_receiver.cpu - before_receiver.cpu
+                      << get_state().cpu.weight
+                      << get_state().cpu.weight_ratio
+                      << get_state().cpu.assumed_stake_weight
+                      << get_state().cpu.initial_weight_ratio
+                      << get_state().cpu.target_weight_ratio
+                      << get_state().cpu.initial_timestamp.sec_since_epoch()
+                      << get_state().cpu.target_timestamp.sec_since_epoch()
+                      << get_state().cpu.exponent
+                      << get_state().cpu.decay_secs
+                      << get_state().cpu.min_price.to_string()
+                      << get_state().cpu.max_price.to_string()
+                      << get_state().cpu.utilization
+                      << get_state().cpu.adjusted_utilization
+                      << get_state().cpu.utilization_timestamp.sec_since_epoch();
+      }
+
+      // if (payer != receiver)
+      // {
+      //    BOOST_REQUIRE_EQUAL(before_payer.ram, after_payer.ram);
+      //    BOOST_REQUIRE_EQUAL(before_payer.net, after_payer.net);
+      //    BOOST_REQUIRE_EQUAL(before_payer.cpu, after_payer.cpu);
+      //    BOOST_REQUIRE_EQUAL(before_receiver.liquid, after_receiver.liquid);
+      // }
+      // BOOST_REQUIRE_EQUAL(before_receiver.ram, after_receiver.ram);
+      // BOOST_REQUIRE_EQUAL(after_receiver.net - before_receiver.net, expected_net);
+      // BOOST_REQUIRE_EQUAL(after_receiver.cpu - before_receiver.cpu, expected_cpu);
+      // //   BOOST_REQUIRE_EQUAL(before_payer.liquid - after_payer.liquid, expected_fee);
+
+      // BOOST_REQUIRE_EQUAL(before_reserve.net - after_reserve.net, expected_net);
+      // BOOST_REQUIRE_EQUAL(before_reserve.cpu - after_reserve.cpu, expected_cpu);
+      // BOOST_REQUIRE_EQUAL(after_state.net.utilization - before_state.net.utilization, expected_net);
+      // BOOST_REQUIRE_EQUAL(after_state.cpu.utilization - before_state.cpu.utilization, expected_cpu);
    }
 };
 
@@ -444,7 +545,7 @@ try
                                  false, core_sym::from_string("500.0000"), core_sym::from_string("500.0000"));
 
    transfer(config::system_account_name, N(aaaaaaaaaaaa), core_sym::from_string("5000000.0000"));
-
+   
    // 10%, 20%
    for (int i = 0; i < 3; i++)
    {
@@ -468,6 +569,233 @@ try
       }
       produce_block(fc::days(30) - fc::milliseconds(500));
       BOOST_REQUIRE_EQUAL("", rentbwexec(config::system_account_name, 100));
+   }   
+}
+FC_LOG_AND_RETHROW()
+
+BOOST_FIXTURE_TEST_CASE(endstate_cliff_tests, rentbw_tester)
+try
+{
+   produce_block();
+   start_rex();
+
+   BOOST_REQUIRE_EQUAL("", configbw(make_config([&](auto &config) {
+                          config.net.current_weight_ratio = endstate_weight_ratio;
+                          config.net.target_weight_ratio = endstate_weight_ratio;
+                          config.net.assumed_stake_weight = stake_weight;
+                          config.net.exponent = 4;
+                          config.net.min_price = asset::from_string("500000.0000 TST");
+                          config.net.max_price = asset::from_string("1000000000.0000 TST");
+
+                          config.cpu.current_weight_ratio = endstate_weight_ratio;
+                          config.cpu.target_weight_ratio = endstate_weight_ratio;
+                          config.cpu.assumed_stake_weight = stake_weight;
+                          config.cpu.exponent = 4;
+                          config.cpu.min_price = asset::from_string("500000.0000 TST");
+                          config.cpu.max_price = asset::from_string("1000000000.0000 TST");
+
+                          config.rent_days = 30;
+                          config.min_rent_fee = asset::from_string("0.0001 TST");
+                       })));
+
+   create_account_with_resources(N(aaaaaaaaaaaa), config::system_account_name, core_sym::from_string("1.0000"),
+                                 false, core_sym::from_string("500.0000"), core_sym::from_string("500.0000"));
+
+   transfer(config::system_account_name, N(aaaaaaaaaaaa), core_sym::from_string("500000000.0000"));
+   auto curr_state = get_state();
+
+   // produce_block(fc::days(60) - fc::milliseconds(500));
+   BOOST_REQUIRE_EQUAL("", rentbwexec(config::system_account_name, 10));
+
+   idump((fc::json::to_pretty_string(curr_state)));
+   auto net_frac = rentbw_frac * .02;
+   auto cpu_frac = rentbw_frac * .02;
+   auto fee = calc_total_fee(curr_state, net_frac, cpu_frac);
+   nocheck_rentbw(N(aaaaaaaaaaaa), N(aaaaaaaaaaaa), 30, net_frac, cpu_frac, fee);
+   produce_block(fc::days(31) - fc::milliseconds(500));
+   // BOOST_REQUIRE_EQUAL("", rentbwexec(config::system_account_name, 100));
+
+   idump((fc::json::to_pretty_string(curr_state)));
+   // auto net_frac = rentbw_frac * .02;
+   // auto cpu_frac = rentbw_frac * .02;
+   curr_state = get_state();
+   fee = calc_total_fee(curr_state, net_frac, cpu_frac);
+   ilog("fee: ${j}",("j",fee));
+   nocheck_rentbw(N(aaaaaaaaaaaa), N(aaaaaaaaaaaa), 30, net_frac, cpu_frac, fee);
+   produce_block(fc::days(31) - fc::milliseconds(500));
+   BOOST_REQUIRE_EQUAL("", rentbwexec(config::system_account_name, 100));  
+}
+FC_LOG_AND_RETHROW()
+
+BOOST_FIXTURE_TEST_CASE(endstate_cliff_bw_tests, rentbw_tester)
+try
+{
+   produce_block();
+   start_rex();
+
+   BOOST_REQUIRE_EQUAL("", configbw(make_config([&](auto &config) {
+                          config.net.current_weight_ratio = endstate_weight_ratio;
+                          config.net.target_weight_ratio = endstate_weight_ratio;
+                          config.net.assumed_stake_weight = stake_weight;
+                          config.net.exponent = 4;
+                          config.net.min_price = asset::from_string("500000.0000 TST");
+                          config.net.max_price = asset::from_string("1000000000.0000 TST");
+
+                          config.cpu.current_weight_ratio = endstate_weight_ratio;
+                          config.cpu.target_weight_ratio = endstate_weight_ratio;
+                          config.cpu.assumed_stake_weight = stake_weight;
+                          config.cpu.exponent = 4;
+                          config.cpu.min_price = asset::from_string("500000.0000 TST");
+                          config.cpu.max_price = asset::from_string("1000000000.0000 TST");
+
+                          config.rent_days = 30;
+                          config.min_rent_fee = asset::from_string("0.0001 TST");
+                       })));
+
+   create_account_with_resources(N(aaaaaaaaaaaa), config::system_account_name, core_sym::from_string("1.0000"),
+                                 false, core_sym::from_string("500.0000"), core_sym::from_string("500.0000"));
+
+   transfer(config::system_account_name, N(aaaaaaaaaaaa), core_sym::from_string("500000000.0000"));
+   auto curr_state = get_state();
+
+   // produce_block(fc::days(60) - fc::milliseconds(500));
+   BOOST_REQUIRE_EQUAL("", rentbwexec(config::system_account_name, 10));
+
+   idump((fc::json::to_pretty_string(curr_state)));
+   auto net_frac = rentbw_frac * .02;
+   auto cpu_frac = rentbw_frac * .02;
+   auto fee = calc_total_fee(curr_state, net_frac, cpu_frac);
+   nocheck_rentbw(N(aaaaaaaaaaaa), N(aaaaaaaaaaaa), 30, net_frac, cpu_frac, fee);
+   produce_block(fc::days(31) - fc::milliseconds(500));
+   BOOST_REQUIRE_EQUAL("", rentbwexec(config::system_account_name, 100));
+
+   idump((fc::json::to_pretty_string(curr_state)));
+   // auto net_frac = rentbw_frac * .02;
+   // auto cpu_frac = rentbw_frac * .02;
+   curr_state = get_state();
+   fee = calc_total_fee(curr_state, net_frac, cpu_frac);
+   ilog("fee: ${j}",("j",fee));
+   nocheck_rentbw(N(aaaaaaaaaaaa), N(aaaaaaaaaaaa), 30, net_frac, cpu_frac, fee);
+   produce_block(fc::days(31) - fc::milliseconds(500));
+   BOOST_REQUIRE_EQUAL("", rentbwexec(config::system_account_name, 100));  
+}
+FC_LOG_AND_RETHROW()
+
+BOOST_FIXTURE_TEST_CASE(endstate_tests, rentbw_tester)
+try
+{
+   produce_block();
+   start_rex();
+
+   BOOST_REQUIRE_EQUAL("", configbw(make_config([&](auto &config) {
+                          config.net.current_weight_ratio = endstate_weight_ratio;
+                          config.net.target_weight_ratio = endstate_weight_ratio;
+                          config.net.assumed_stake_weight = stake_weight;
+                          config.net.exponent = 4;
+                          config.net.min_price = asset::from_string("500000.0000 TST");
+                          config.net.max_price = asset::from_string("1000000000.0000 TST");
+
+                          config.cpu.current_weight_ratio = endstate_weight_ratio;
+                          config.cpu.target_weight_ratio = endstate_weight_ratio;
+                          config.cpu.assumed_stake_weight = stake_weight;
+                          config.cpu.exponent = 4;
+                          config.cpu.min_price = asset::from_string("500000.0000 TST");
+                          config.cpu.max_price = asset::from_string("1000000000.0000 TST");
+
+                          config.rent_days = 30;
+                          config.min_rent_fee = asset::from_string("0.0001 TST");
+                       })));
+
+   create_account_with_resources(N(aaaaaaaaaaaa), config::system_account_name, core_sym::from_string("1.0000"),
+                                 false, core_sym::from_string("500.0000"), core_sym::from_string("500.0000"));
+
+   transfer(config::system_account_name, N(aaaaaaaaaaaa), core_sym::from_string("500000000.0000"));
+   auto curr_state = get_state();
+
+   // produce_block(fc::days(60) - fc::milliseconds(500));
+   BOOST_REQUIRE_EQUAL("", rentbwexec(config::system_account_name, 10));
+
+   // 2%, 2%
+   for (int m = 0; m < 1; m++)
+   {
+      // rent every day during 15 days
+      for (int j = 0; j < 15; j++)
+      {  
+         ilog("iteration: ${j}",("j",j));
+         curr_state = get_state();
+         auto net_frac = rentbw_frac * .02;
+         auto cpu_frac = rentbw_frac * .02;
+         auto fee = calc_total_fee(curr_state, net_frac, cpu_frac);
+         // idump((fc::json::to_pretty_string(curr_state)));
+         // ilog("fee: ${j}",("j",fee));
+         check_rentbw(N(aaaaaaaaaaaa), N(aaaaaaaaaaaa), 30, net_frac, cpu_frac,
+                        fee, curr_state.net.weight * .02, curr_state.cpu.weight * .02);
+         produce_block(fc::days(1) - fc::milliseconds(500));
+      }
+      produce_block(fc::days(30) - fc::milliseconds(500));
+      BOOST_REQUIRE_EQUAL("", rentbwexec(config::system_account_name, 100));
+   }   
+}
+FC_LOG_AND_RETHROW()
+
+BOOST_FIXTURE_TEST_CASE(endstate_year_tests, rentbw_tester)
+try
+{
+   produce_block();
+   start_rex();
+
+   BOOST_REQUIRE_EQUAL("", configbw(make_config([&](auto &config) {
+                          config.net.current_weight_ratio = endstate_weight_ratio;
+                          config.net.target_weight_ratio = endstate_weight_ratio;
+                          config.net.assumed_stake_weight = stake_weight;
+                          config.net.exponent = 4;
+                          config.net.min_price = asset::from_string("500000.0000 TST");
+                          config.net.max_price = asset::from_string("1000000000.0000 TST");
+
+                          config.cpu.current_weight_ratio = endstate_weight_ratio;
+                          config.cpu.target_weight_ratio = endstate_weight_ratio;
+                          config.cpu.assumed_stake_weight = stake_weight;
+                          config.cpu.exponent = 4;
+                          config.cpu.min_price = asset::from_string("500000.0000 TST");
+                          config.cpu.max_price = asset::from_string("1000000000.0000 TST");
+
+                          config.rent_days = 30;
+                          config.min_rent_fee = asset::from_string("0.0001 TST");
+                       })));
+
+   auto net_weight = stake_weight;
+   auto cpu_weight = stake_weight;
+
+   create_account_with_resources(N(aaaaaaaaaaaa), config::system_account_name, core_sym::from_string("100.0000"),
+                                 false, core_sym::from_string("10000.0000"), core_sym::from_string("10000.0000"));
+
+   transfer(config::system_account_name, N(aaaaaaaaaaaa), core_sym::from_string("500000000.0000"));
+   auto curr_state = get_state();
+
+   // produce_block(fc::days(60) - fc::milliseconds(500));
+   BOOST_REQUIRE_EQUAL("", rentbwexec(config::system_account_name, 10));
+
+   // generate random number between 990,000 (0.01%) and 4,950,000 (0.05%)
+   std::default_random_engine generator;
+   std::uniform_int_distribution<int> distribution(990'000, 4'950'000);
+   // rent 15 times a day for a year
+   for (int m = 0; m < 366; m++)
+   {
+      // rent once a day for a year
+      for (int j = 0; j <= 15; j++)
+      {  
+         // ilog("day: ${j}",("j",j));
+         curr_state = get_state();
+         auto frac = distribution(generator);
+         auto net_frac = frac * .25;
+         auto cpu_frac = frac * .75;
+         auto fee = calc_total_fee(curr_state, net_frac, cpu_frac);
+         nocheck_rentbw(N(aaaaaaaaaaaa), N(aaaaaaaaaaaa), 30, net_frac, cpu_frac, fee);
+         produce_block(fc::hours(1) - fc::milliseconds(500));
+      }
+      produce_block(fc::days(1) - fc::milliseconds(500));
+      // produce_block(fc::days(30) - fc::milliseconds(500));
+      // BOOST_REQUIRE_EQUAL("", rentbwexec(config::system_account_name, 100));
    }   
 }
 FC_LOG_AND_RETHROW()
