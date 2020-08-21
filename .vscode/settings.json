@@ -1,6 +1,26 @@
 {
     "files.associations": {
         "locale": "cpp",
-        "string": "cpp"
+        "string": "cpp",
+        "__functional_03": "cpp",
+        "__functional_base": "cpp",
+        "__hash_table": "cpp",
+        "__tree": "cpp",
+        "algorithm": "cpp",
+        "bitset": "cpp",
+        "chrono": "cpp",
+        "condition_variable": "cpp",
+        "functional": "cpp",
+        "memory": "cpp",
+        "numeric": "cpp",
+        "optional": "cpp",
+        "random": "cpp",
+        "string_view": "cpp",
+        "system_error": "cpp",
+        "thread": "cpp",
+        "unordered_map": "cpp",
+        "utility": "cpp",
+        "vector": "cpp",
+        "*.tcc": "cpp"
     }
 }
