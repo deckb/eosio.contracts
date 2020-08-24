@@ -63,11 +63,12 @@ struct rentbw_state_resource
    int64_t utilization;
    int64_t adjusted_utilization;
    time_point_sec utilization_timestamp;
+   int64_t fee;
 };
 FC_REFLECT(rentbw_state_resource,                                                                           //
            (version)(weight)(weight_ratio)(assumed_stake_weight)(initial_weight_ratio)(target_weight_ratio) //
            (initial_timestamp)(target_timestamp)(exponent)(decay_secs)(min_price)(max_price)(utilization)   //
-           (adjusted_utilization)(utilization_timestamp))
+           (adjusted_utilization)(utilization_timestamp)(fee))
 
 struct rentbw_state
 {
