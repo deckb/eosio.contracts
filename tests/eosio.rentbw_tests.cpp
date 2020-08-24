@@ -221,6 +221,21 @@ struct rentbw_tester : eosio_system_tester
       return fee;
    }
 
+   asset calc_both_fees(const rentbw_state& state, int64_t net_frac, int64_t cpu_frac) 
+   {
+      auto net_util = __int128_t(net_frac) * state.net.weight / rentbw_frac;
+      auto net_fee = calc_rentbw_fee(state.net, net_util);
+      auto cpu_util = __int128_t(cpu_frac) * state.cpu.weight / rentbw_frac;
+      auto cpu_fee = calc_rentbw_fee(state.cpu, cpu_util);
+      
+      asset fee = core_sym::from_string("0.0000");
+      if (net_fee > 0 && cpu_fee > 0) {
+         ilog("net_fee: ${net_fee} cpu_fee: ${cpu_fee}",("net_fee",net_fee)("cpu_fee",cpu_fee));
+         fee = asset(net_fee + cpu_fee, symbol{CORE_SYM});
+      }
+      return fee;
+   }
+
    int64_t calc_rentbw_fee(const rentbw_state_resource& state, int64_t utilization_increase) {
       if( utilization_increase <= 0 ) return 0;
 
@@ -857,5 +872,185 @@ try
 }
 FC_LOG_AND_RETHROW()
 
+
+BOOST_FIXTURE_TEST_CASE(transition_year_test, rentbw_tester)
+try
+{
+   produce_block();
+   start_rex();
+
+   BOOST_REQUIRE_EQUAL("", configbw(make_config([&](auto &config) {
+                          config.net.current_weight_ratio = rentbw_frac;
+                          config.net.target_weight_ratio = rentbw_frac / 100;
+                          config.net.assumed_stake_weight = 131'668'749;
+                          // config.net.assumed_stake_weight = 944'076'307; // jungle
+
+                          config.net.exponent = 4;
+                          config.net.min_price = asset::from_string("500000.0000 TST");
+                          config.net.max_price = asset::from_string("1000000000.0000 TST");
+                          config.net.decay_secs = 86400;
+                          config.net.target_timestamp = control->head_block_time() + fc::days(365);
+
+                          config.cpu.current_weight_ratio = rentbw_frac;
+                          config.cpu.target_weight_ratio = rentbw_frac / 100;
+                          config.cpu.assumed_stake_weight = 395'006'248; 
+                          // config.cpu.assumed_stake_weight = 3'776'305'228; // jungle
+
+                          config.cpu.exponent = 4;
+                          config.cpu.min_price = asset::from_string("500000.0000 TST");
+                          config.cpu.max_price = asset::from_string("1000000000.0000 TST");
+                          config.cpu.decay_secs = 86400;
+                          config.cpu.target_timestamp = control->head_block_time() + fc::days(365);
+
+                          config.rent_days = 30;
+                          config.min_rent_fee = asset::from_string("0.0001 TST");
+                       })));
+   auto curr_state = get_state();
+   idump((fc::json::to_pretty_string(curr_state)));
+   auto net_weight = stake_weight;
+   auto cpu_weight = stake_weight;
+
+   create_account_with_resources(N(aaaaaaaaaaaa), config::system_account_name, core_sym::from_string("100.0000"),
+                                 false, core_sym::from_string("10000.0000"), core_sym::from_string("10000.0000"));
+
+   transfer(config::system_account_name, N(aaaaaaaaaaaa), core_sym::from_string("500000000.0000"));
+   produce_block();
+
+   for( int i =0; i < 730; i++){
+      
+      produce_block(fc::days(1) - fc::milliseconds(500));
+      BOOST_REQUIRE_EQUAL("", rentbwexec(config::system_account_name, 10));
+      // curr_state = get_state();
+      // auto net_frac = long(rentbw_frac * 0.01);
+      // auto cpu_frac = long(rentbw_frac * 0.01);
+      // auto fee = calc_both_fees(curr_state, net_frac, cpu_frac);
+      // if(fee > core_sym::from_string("0.0000")) {
+      //    nocheck_rentbw(N(aaaaaaaaaaaa), N(aaaaaaaaaaaa), 30, net_frac, cpu_frac, fee);
+      // }
+   }
+
+   curr_state = get_state();
+   idump((fc::json::to_pretty_string(curr_state)));
+   idump((fc::json::to_pretty_string(last_block_time())));
+   auto reserv_acct = get_account_info(N(eosio.reserv));
+   ilog("net: ${net} cpu: ${cpu}",("net", reserv_acct.net)("cpu", reserv_acct.cpu));
+
+   // // generate random number between 9,900,000,000 (0.01%) and 49,500,000,000 (0.05%)
+   // std::default_random_engine generator;
+   // std::uniform_int_distribution<uint64_t> distribution(990'000'0000, 4'950'000'0000);
+   // // rent 15 times a day for a year
+   // for (int m = 0; m < 366; m++)
+   // {
+   //    // rent once a day for a year
+   //    for (int j = 0; j <= 15; j++)
+   //    {  
+   //       // ilog("day: ${j}",("j",j));
+   //       curr_state = get_state();
+   //       auto frac = distribution(generator);
+   //       auto net_frac = frac * .25;
+   //       auto cpu_frac = frac * .75;
+   //       auto fee = calc_total_fee(curr_state, net_frac, cpu_frac);
+   //       nocheck_rentbw(N(aaaaaaaaaaaa), N(aaaaaaaaaaaa), 30, net_frac, cpu_frac, fee);
+   //       produce_block(fc::hours(1) - fc::milliseconds(500));
+   //    }
+   //    produce_block(fc::days(1) - fc::milliseconds(500));
+   //    // produce_block(fc::days(30) - fc::milliseconds(500));
+   //    // BOOST_REQUIRE_EQUAL("", rentbwexec(config::system_account_name, 100));
+   // }   
+}
+FC_LOG_AND_RETHROW()
+
+BOOST_FIXTURE_TEST_CASE(jungle_transition_test, rentbw_tester)
+try
+{
+   produce_block();
+   start_rex();
+
+   BOOST_REQUIRE_EQUAL("", configbw(make_config([&](auto &config) {
+                          config.net.current_weight_ratio = rentbw_frac;
+                          config.net.target_weight_ratio = rentbw_frac / 100;
+                          config.net.assumed_stake_weight = 944'076'307; // jungle
+
+                          config.net.exponent = 2;
+                        //   config.net.min_price = asset::from_string("500000.0000 TST");
+                        //   config.net.max_price = asset::from_string("1000000000.0000 TST");
+                          config.net.min_price = asset::from_string("0.0000 TST");
+                          config.net.max_price = asset::from_string("10000000.0000 TST");
+                          config.net.decay_secs = 86400;
+                          config.net.target_timestamp = control->head_block_time() + fc::days(12);
+
+                          config.cpu.current_weight_ratio = rentbw_frac;
+                          config.cpu.target_weight_ratio = rentbw_frac / 100;
+                          config.cpu.assumed_stake_weight = 3'776'305'228; // jungle
+
+                          config.cpu.exponent = 2;
+                        //   config.cpu.min_price = asset::from_string("500000.0000 TST");
+                        //   config.cpu.max_price = asset::from_string("1000000000.0000 TST");
+                          config.cpu.min_price = asset::from_string("0.0000 TST");
+                          config.cpu.max_price = asset::from_string("10000000.0000 TST");
+                          config.cpu.decay_secs = 86400;
+                          config.cpu.target_timestamp = control->head_block_time() + fc::days(12);
+
+                          config.rent_days = 30;
+                          config.min_rent_fee = asset::from_string("0.0001 TST");
+                       })));
+   auto curr_state = get_state();
+   idump((fc::json::to_pretty_string(curr_state)));
+   auto net_weight = stake_weight;
+   auto cpu_weight = stake_weight;
+
+   create_account_with_resources(N(aaaaaaaaaaaa), config::system_account_name, core_sym::from_string("100.0000"),
+                                 false, core_sym::from_string("10000.0000"), core_sym::from_string("10000.0000"));
+
+   transfer(config::system_account_name, N(aaaaaaaaaaaa), core_sym::from_string("500000000.0000"));
+   produce_block();
+   produce_block(fc::days(30) - fc::milliseconds(500));
+
+   for( int i =0; i < 60; i++){
+      
+      produce_block(fc::days(1) - fc::milliseconds(500));
+      BOOST_REQUIRE_EQUAL("", rentbwexec(config::system_account_name, 10));
+      for( int j = 0; j < 1; j++)
+      {
+         curr_state = get_state();
+         auto net_frac = long(rentbw_frac * 0.01);
+         auto cpu_frac = long(rentbw_frac * 0.01);
+         auto fee = calc_both_fees(curr_state, net_frac, cpu_frac);
+         if(fee > core_sym::from_string("0.0000")) {
+            nocheck_rentbw(N(aaaaaaaaaaaa), N(aaaaaaaaaaaa), 30, net_frac, cpu_frac, fee);
+         }
+      }
+   }
+
+   curr_state = get_state();
+   idump((fc::json::to_pretty_string(curr_state)));
+   idump((fc::json::to_pretty_string(last_block_time())));
+   auto reserv_acct = get_account_info(N(eosio.reserv));
+   ilog("net: ${net} cpu: ${cpu}",("net", reserv_acct.net)("cpu", reserv_acct.cpu));
+
+   // // generate random number between 9,900,000,000 (0.01%) and 49,500,000,000 (0.05%)
+   // std::default_random_engine generator;
+   // std::uniform_int_distribution<uint64_t> distribution(990'000'0000, 4'950'000'0000);
+   // // rent 15 times a day for a year
+   // for (int m = 0; m < 366; m++)
+   // {
+   //    // rent once a day for a year
+   //    for (int j = 0; j <= 15; j++)
+   //    {  
+   //       // ilog("day: ${j}",("j",j));
+   //       curr_state = get_state();
+   //       auto frac = distribution(generator);
+   //       auto net_frac = frac * .25;
+   //       auto cpu_frac = frac * .75;
+   //       auto fee = calc_total_fee(curr_state, net_frac, cpu_frac);
+   //       nocheck_rentbw(N(aaaaaaaaaaaa), N(aaaaaaaaaaaa), 30, net_frac, cpu_frac, fee);
+   //       produce_block(fc::hours(1) - fc::milliseconds(500));
+   //    }
+   //    produce_block(fc::days(1) - fc::milliseconds(500));
+   //    // produce_block(fc::days(30) - fc::milliseconds(500));
+   //    // BOOST_REQUIRE_EQUAL("", rentbwexec(config::system_account_name, 100));
+   // }   
+}
+FC_LOG_AND_RETHROW()
 
 BOOST_AUTO_TEST_SUITE_END()
