@@ -370,7 +370,7 @@ void system_contract::rentbw(const name& payer, const name& receiver, uint32_t d
    process(cpu_frac, cpu_amount, state.cpu);
    if (fee > max_payment) {
       std::string error_msg = "max_payment is less than calculated fee: ";
-      error_msg += fee.to_string();
+      error_msg += fee.to_string() + " max_payment: " + max_payment.to_string();
       eosio::check(false, error_msg);
    }
    eosio::check(fee >= state.min_rent_fee, "calculated fee is below minimum; try renting more");
