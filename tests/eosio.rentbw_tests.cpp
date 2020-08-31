@@ -97,13 +97,17 @@ struct rentbw_tester : eosio_system_tester
                          << "before_state.net.assumed_stake_weight"
                          << "before_state.net.weight_ratio"
                          << "before_state.net.weight"
-                         << "before_receiver.net"
-                         << "after_receiver.net"
-                         << "net.delta"
                          << "before_reserve.net"
                          << "after_reserve.net"
                          << "before_reserve.cpu"
                          << "after_reserve.cpu"
+                        //  << "before_receiver.net"
+                        //  << "after_receiver.net"
+                         << "net.frac"
+                         << "net.delta"
+                        //  << "before_receiver.cpu"
+                        //  << "after_receiver.cpu"
+                         << "cpu.frac"
                          << "cpu.delta"
                          << "fee" //"before_payer.liquid-after_payer.liquid"
                          << "net.fee"
@@ -353,25 +357,29 @@ struct rentbw_tester : eosio_system_tester
                      account_info before_receiver, account_info after_receiver,
                      account_info before_reserve, account_info after_reserve, 
                      rentbw_state before_state, rentbw_state after_state,
-                     uint64_t net_fee, uint64_t cpu_fee)
+                     uint64_t net_fee, uint64_t net_frac, uint64_t cpu_fee, uint64_t cpu_frac)
    {     
       auto curr_state = get_state();
       csv.newRow()    << last_block_time()              
                       << before_state.net.assumed_stake_weight
                       << before_state.net.weight_ratio / double(rentbw_frac)
                       << before_state.net.weight
-                      << before_receiver.net
-                      << after_receiver.net
-                     //  << (after_receiver.net - before_receiver.net) / 10000.0
-                      << (curr_state.net.utilization - before_state.net.utilization) / 10000.0
-                      << before_reserve.net
-                      << after_reserve.net
-                      << before_reserve.cpu
-                      << after_reserve.cpu
-                      //<< (after_receiver.cpu - before_receiver.cpu) / 10000.0
-                      << (curr_state.cpu.utilization - before_state.cpu.utilization) / 10000.0
-                      << float((before_payer.liquid - after_payer.liquid).get_amount()) / 10000.0
-                      << float(net_fee) / 10000.0000
+                      << float(before_reserve.net / 10000.0)
+                      << float(after_reserve.net / 10000.0)
+                      << float(before_reserve.cpu / 10000.0)
+                      << float(after_reserve.cpu / 10000.0)
+                     //  << float(before_receiver.net / 10000.0)
+                     //  << float(after_receiver.net / 10000.0) 
+                      << net_frac
+                      << float((after_receiver.net - before_receiver.net) / 10000.0)
+                     //  << (curr_state.net.utilization - before_state.net.utilization) / 10000.0
+                     //  << float(before_receiver.cpu / 10000.0)
+                     //  << float(after_receiver.cpu / 10000.0)
+                      << cpu_frac
+                      << float((after_receiver.cpu - before_receiver.cpu) / 10000.0)
+                     //  << (curr_state.cpu.utilization - before_state.cpu.utilization) / 10000.0
+                      << float((before_payer.liquid - after_payer.liquid).get_amount() / 10000.0) 
+                      << float(net_fee / 10000.0) 
                       << curr_state.net.weight
                       << curr_state.net.weight_ratio
                       << curr_state.net.assumed_stake_weight
@@ -386,7 +394,7 @@ struct rentbw_tester : eosio_system_tester
                       << curr_state.net.utilization
                       << curr_state.net.adjusted_utilization
                       << curr_state.net.utilization_timestamp.sec_since_epoch()
-                      << float(cpu_fee) / 10000.0000
+                      << float(cpu_fee / 10000.0) 
                       << curr_state.cpu.weight
                       << curr_state.cpu.weight_ratio
                       << curr_state.cpu.assumed_stake_weight
@@ -448,7 +456,7 @@ struct rentbw_tester : eosio_system_tester
                       before_receiver, after_receiver, 
                       before_reserve, after_reserve,
                       before_state, after_state,
-                      net_fee, cpu_fee);
+                      net_fee, net_frac, cpu_fee, cpu_frac);
       }
 
       if (payer != receiver)
@@ -488,31 +496,32 @@ struct rentbw_tester : eosio_system_tester
       
       if (GENERATE_CSV)
       {
+         ilog("net_frac:    ${x}", ("x", net_frac));
+         ilog("cpu_frac:    ${x}", ("x", cpu_frac));
+         // ilog("before_state.net.assumed_stake_weight:    ${x}", ("x", before_state.net.assumed_stake_weight));
+         // ilog("before_state.net.weight_ratio:            ${x}",
+         //      ("x", before_state.net.weight_ratio / double(rentbw_frac)));
+         // ilog("before_state.net.assumed_stake_weight:    ${x}", ("x", before_state.net.assumed_stake_weight));
+         // ilog("before_state.net.weight:                  ${x}", ("x", before_state.net.weight));
 
-         ilog("before_state.net.assumed_stake_weight:    ${x}", ("x", before_state.net.assumed_stake_weight));
-         ilog("before_state.net.weight_ratio:            ${x}",
-              ("x", before_state.net.weight_ratio / double(rentbw_frac)));
-         ilog("before_state.net.assumed_stake_weight:    ${x}", ("x", before_state.net.assumed_stake_weight));
-         ilog("before_state.net.weight:                  ${x}", ("x", before_state.net.weight));
-
-         ilog("before_receiver.net:                      ${x}", ("x", before_receiver.net));
-         ilog("after_receiver.net:                       ${x}", ("x", after_receiver.net));
-         ilog("after_receiver.net - before_receiver.net: ${x}", ("x", after_receiver.net - before_receiver.net));
-         // ilog("expected_net:                             ${x}", ("x", expected_net));
-         ilog("before_payer.liquid - after_payer.liquid: ${x}", ("x", before_payer.liquid - after_payer.liquid));
-         ilog("max_payment:                              ${x}", ("x", expected_fee));
-         ilog("expected_net_fee:                         ${x}", ("x", net_fee));
-         ilog("expected_cpu_fee:                         ${x}", ("x", cpu_fee));
-         ilog("before_reserve.net:                       ${x}", ("x", before_reserve.net));
-         ilog("after_reserve.net:                        ${x}", ("x", after_reserve.net));
-         ilog("before_reserve.cpu:                       ${x}", ("x", before_reserve.cpu));
-         ilog("after_reserve.cpu:                        ${x}", ("x", after_reserve.cpu));
+         // ilog("before_receiver.net:                      ${x}", ("x", before_receiver.net));
+         // ilog("after_receiver.net:                       ${x}", ("x", after_receiver.net));
+         // ilog("after_receiver.net - before_receiver.net: ${x}", ("x", after_receiver.net - before_receiver.net));
+         // // ilog("expected_net:                             ${x}", ("x", expected_net));
+         // ilog("before_payer.liquid - after_payer.liquid: ${x}", ("x", before_payer.liquid - after_payer.liquid));
+         // ilog("max_payment:                              ${x}", ("x", expected_fee));
+         // ilog("expected_net_fee:                         ${x}", ("x", net_fee));
+         // ilog("expected_cpu_fee:                         ${x}", ("x", cpu_fee));
+         // ilog("before_reserve.net:                       ${x}", ("x", before_reserve.net));
+         // ilog("after_reserve.net:                        ${x}", ("x", after_reserve.net));
+         // ilog("before_reserve.cpu:                       ${x}", ("x", before_reserve.cpu));
+         // ilog("after_reserve.cpu:                        ${x}", ("x", after_reserve.cpu));
 
          write_to_csv(before_payer, after_payer, 
                       before_receiver, after_receiver, 
                       before_reserve, after_reserve,
                       before_state, after_state,
-                      net_fee, cpu_fee);
+                      net_fee, net_frac, cpu_fee, cpu_frac);
       }
    }
 };
@@ -925,7 +934,7 @@ try
 
    // generate random number between 0.01% and 0.05%
    std::default_random_engine generator;
-   std::uniform_int_distribution<uint64_t> distribution(rentbw_frac * 0.0001, rentbw_frac * 0.0005);
+   std::uniform_int_distribution<uint64_t> distribution(rentbw_frac * 0.0001, rentbw_frac * 0.001);
    // rent 15 times a day for a year
    for (int m = 0; m < 365; m++)
    {
