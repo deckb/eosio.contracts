@@ -33,3 +33,7 @@
 
 build/*
 .DS_Store
+
+configs/
+model_config.json
+*.csv

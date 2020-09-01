@@ -28,8 +28,6 @@ inline constexpr int64_t rentbw_frac = 1'000'000'000'000'000ll;  // 1.0 = 10^15
 inline constexpr int64_t endstate_weight_ratio = 10000000000000ll;     // 0.1 = 10^13
 inline constexpr int64_t stake_weight  = 1000000000000ll;     // 0.01 = 10^12
 
-inline constexpr int64_t endstate_weight_ratio = 1'000'000'000'000'0ll;     // 0.1 = 10^13
-
 struct rentbw_config_resource
 {
    fc::optional<int64_t> current_weight_ratio = {};
@@ -240,7 +238,7 @@ struct rentbw_tester : eosio_system_tester
       config.net.current_weight_ratio = v.get("net").get("current_weight_ratio").get<int64_t>();
       config.net.target_weight_ratio = v.get("net").get("target_weight_ratio").get<int64_t>();
       config.net.assumed_stake_weight = v.get("net").get("assumed_stake_weight").get<int64_t>();
-      config.net.target_timestamp = control->head_block_time() + fc::days(100);
+      config.net.target_timestamp = control->head_block_time() + fc::days(365);
       config.net.exponent = v.get("net").get("exponent").get<int64_t>();
       config.net.decay_secs = v.get("net").get("decay_secs").get<int64_t>();
       config.net.min_price = asset::from_string(v.get("net").get("min_price").get<string>());
@@ -249,7 +247,7 @@ struct rentbw_tester : eosio_system_tester
       config.cpu.current_weight_ratio = v.get("cpu").get("current_weight_ratio").get<int64_t>();;
       config.cpu.target_weight_ratio = v.get("cpu").get("target_weight_ratio").get<int64_t>();;
       config.cpu.assumed_stake_weight = v.get("cpu").get("assumed_stake_weight").get<int64_t>();
-      config.cpu.target_timestamp = control->head_block_time() + fc::days(100);
+      config.cpu.target_timestamp = control->head_block_time() + fc::days(365);
       config.cpu.exponent =  v.get("cpu").get("exponent").get<int64_t>();
       config.cpu.decay_secs = v.get("cpu").get("decay_secs").get<int64_t>();
       config.cpu.min_price = asset::from_string(v.get("cpu").get("min_price").get<string>());
@@ -929,32 +927,34 @@ try
    produce_block();
    start_rex();
 
-   BOOST_REQUIRE_EQUAL("", configbw(make_config([&](auto &config) {
-                          config.net.current_weight_ratio = rentbw_frac; // 10^15
-                          config.net.target_weight_ratio = rentbw_frac / 100; // 10^13
-                          config.net.assumed_stake_weight = 131'668'749;
-                          // config.net.assumed_stake_weight = 944'076'307; // jungle
-
-                          config.net.exponent = 4;
-                          config.net.min_price = asset::from_string("500000.0000 TST");
-                          config.net.max_price = asset::from_string("1000000000.0000 TST");
-                          config.net.decay_secs = 86400;
-                          config.net.target_timestamp = control->head_block_time() + fc::days(365);
-
-                          config.cpu.current_weight_ratio = rentbw_frac;
-                          config.cpu.target_weight_ratio = rentbw_frac / 100;
-                          config.cpu.assumed_stake_weight = 395'006'248; 
-                          // config.cpu.assumed_stake_weight = 3'776'305'228; // jungle
-
-                          config.cpu.exponent = 4;
-                          config.cpu.min_price = asset::from_string("500000.0000 TST");
-                          config.cpu.max_price = asset::from_string("1000000000.0000 TST");
-                          config.cpu.decay_secs = 86400;
-                          config.cpu.target_timestamp = control->head_block_time() + fc::days(365);
-
-                          config.rent_days = 30;
-                          config.min_rent_fee = asset::from_string("0.0001 TST");
+   BOOST_REQUIRE_EQUAL("", configbw(make_config_from_file(CFG_FILENAME, [&](auto &config) {
                        })));
+   // BOOST_REQUIRE_EQUAL("", configbw(make_config([&](auto &config) {
+   //                        config.net.current_weight_ratio = rentbw_frac; // 10^15
+   //                        config.net.target_weight_ratio = rentbw_frac / 100; // 10^13
+   //                        config.net.assumed_stake_weight = 131'668'749;
+
+   //                        config.net.exponent = 4;
+   //                        config.net.min_price = asset::from_string("500000.0000 TST");
+   //                        config.net.max_price = asset::from_string("1000000000.0000 TST");
+   //                        config.net.decay_secs = 86400;
+   //                        config.net.target_timestamp = control->head_block_time() + fc::days(365);
+
+   //                        config.cpu.current_weight_ratio = rentbw_frac;
+   //                        config.cpu.target_weight_ratio = rentbw_frac / 100;
+   //                        config.cpu.assumed_stake_weight = 395'006'248; 
+   //                        // config.cpu.assumed_stake_weight = 3'776'305'228; // jungle
+
+   //                        config.cpu.exponent = 4;
+   //                        config.cpu.min_price = asset::from_string("500000.0000 TST");
+   //                        config.cpu.max_price = asset::from_string("1000000000.0000 TST");
+   //                        config.cpu.decay_secs = 86400;
+   //                        config.cpu.target_timestamp = control->head_block_time() + fc::days(365);
+
+   //                        config.rent_days = 30;
+   //                        config.min_rent_fee = asset::from_string("0.0001 TST");
+   //                     })));
+
    auto curr_state = get_state();
    idump((fc::json::to_pretty_string(curr_state)));
    auto net_weight = stake_weight;
