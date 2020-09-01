@@ -6,11 +6,13 @@ fi
 
 mkdir -p build
 pushd build
+set -e
 cmake -DBUILD_TESTS=true -DCMAKE_PREFIX_PATH=~/eosio/2.1/ -DBOOST_ROOT=~/eosio/2.1/src/boost_1_72_0 ..
 make -j
+set +e
 popd
 
-cp $2 model_config.json
+cp $2 _model_config.json
 build/tests/unit_test -t $1
 mv model_tests.csv $3
 

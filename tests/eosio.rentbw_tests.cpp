@@ -11,9 +11,12 @@
 #include <sstream>
 #include <fstream>
 #include <random>
+#include <time.h>
+
 
 #include "eosio.system_tester.hpp"
 #include "csvwriter.hpp"
+#include "csv.h"
 
 
 #define PICOJSON_USE_INT64
@@ -22,7 +25,9 @@
 
 #define GENERATE_CSV true
 #define CSV_FILENAME "model_tests.csv"
-#define CFG_FILENAME "model_config.json"
+#define CFG_FILENAME "_model_config.json"
+#define INP_FILENAME "_rentbw_input.csv"
+
 
 inline constexpr int64_t rentbw_frac = 1'000'000'000'000'000ll;  // 1.0 = 10^15
 inline constexpr int64_t endstate_weight_ratio = 10000000000000ll;     // 0.1 = 10^13
@@ -586,42 +591,59 @@ try
                                  false, core_sym::from_string("500.0000"), core_sym::from_string("500.0000"));
 
    transfer(config::system_account_name, N(aaaaaaaaaaaa), core_sym::from_string("5000000.0000"));
+
+   io::CSVReader<9> in(INP_FILENAME);
+    in.read_header(io::ignore_extra_column, "datetime", "function", "payer", "receiver", "days", "net_frac", "cpu_frac", "max_payment", "queue_max");
    
-   // 10%, 20%
-   for (int i = 0; i < 3; i++)
-   {
-      check_rentbw(N(aaaaaaaaaaaa), N(aaaaaaaaaaaa), 30, rentbw_frac * .1, rentbw_frac * .2,
-                   asset::from_string("300000.0000 TST"), net_weight * .1, cpu_weight * .2);
-      produce_block(fc::days(10) - fc::milliseconds(500));
-   }
+    std::string   datetime, function, payer, receiver;
+    uint32_t      days;
+    int64_t       net_frac,cpu_frac;
+    std:: string  max_payment;
+    uint16_t      queue_max;
 
-   produce_block(fc::days(60) - fc::milliseconds(500));
-   BOOST_REQUIRE_EQUAL("", rentbwexec(config::system_account_name, 10));
+    std::chrono::system_clock::time_point cursor; 
+    bool first_timepoint = true;
 
-      // 10%, 20%
-   for (int i = 0; i < 3; i++)
-   {
-      check_rentbw(N(aaaaaaaaaaaa), N(aaaaaaaaaaaa), 30, rentbw_frac * .05, rentbw_frac * .1,
-                   asset::from_string("300000.0000 TST"), net_weight * .05, cpu_weight * .1);
-      produce_block(fc::days(10) - fc::milliseconds(500));
-   }
+    while(in.read_row(datetime,function,payer,receiver,days,net_frac,cpu_frac,max_payment,queue_max)){
+       if (function ==  "rentbwexec") {
+            std::cout << "!! RentbwExec called with que_max: " << queue_max << std::endl;
+            BOOST_REQUIRE_EQUAL("", rentbwexec(config::system_account_name, queue_max));
+       }
+       else if (function ==  "rentbw") {
+          
+            std::tm tm = {};
 
-   produce_block(fc::days(60) - fc::milliseconds(500));
-   BOOST_REQUIRE_EQUAL("", rentbwexec(config::system_account_name, 10));
+            ::strptime(datetime.c_str(), "%m/%d/%Y %H:%M:%S", &tm);
+            auto tp = std::chrono::system_clock::from_time_t(std::mktime(&tm));
+            auto time_diff = 0;
 
-   // 2%, 2%
-   for (int m = 0; m < 6; m++)
-   {
-      // rent every day during 15 days
-      for (int j = 1; j < 15; j++)
-      {
-         check_rentbw(N(aaaaaaaaaaaa), N(aaaaaaaaaaaa), 30, rentbw_frac * .02, 0,
-                      asset::from_string("40000.0000 TST"), net_weight * .02, 0);
-         produce_block(fc::days(1) - fc::milliseconds(500));
-      }
-      produce_block(fc::days(30) - fc::milliseconds(500));
-      BOOST_REQUIRE_EQUAL("", rentbwexec(config::system_account_name, 100));
-   }   
+            if (first_timepoint) {
+               cursor = tp;
+               first_timepoint = false;
+            }
+            else {
+                time_diff = std::chrono::duration_cast<std::chrono::milliseconds>(tp - cursor).count(); 
+                cursor = tp;
+            }
+       
+            if (time_diff>500) {
+               produce_block(fc::milliseconds(time_diff) - fc::milliseconds(500));
+            }
+
+
+            account_name payer_name = string_to_name(payer);
+            account_name receiver_name = string_to_name(receiver);
+
+            check_rentbw(payer_name, receiver_name, 
+               days, net_frac, cpu_frac, asset::from_string(max_payment + " TST"), 0,0);
+       }
+       else {
+          // 
+       }
+        
+    }
+
+  
 }
 FC_LOG_AND_RETHROW()
 

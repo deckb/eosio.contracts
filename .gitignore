@@ -36,3 +36,4 @@ build/*
 
 configs/
 *.csv
+_model_config.json
