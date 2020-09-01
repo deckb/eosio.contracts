@@ -31,7 +31,7 @@
 
 inline constexpr int64_t rentbw_frac = 1'000'000'000'000'000ll;  // 1.0 = 10^15
 inline constexpr int64_t endstate_weight_ratio = 10000000000000ll;     // 0.1 = 10^13
-inline constexpr int64_t stake_weight  = 1000000000000ll;     // 0.01 = 10^12
+inline constexpr int64_t stake_weight  = 1000000000000ll;     
 
 struct rentbw_config_resource
 {
