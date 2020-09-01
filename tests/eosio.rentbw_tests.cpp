@@ -548,24 +548,6 @@ struct rentbw_tester : eosio_system_tester
       {
          ilog("net_frac:    ${x}", ("x", net_frac));
          ilog("cpu_frac:    ${x}", ("x", cpu_frac));
-         // ilog("before_state.net.assumed_stake_weight:    ${x}", ("x", before_state.net.assumed_stake_weight));
-         // ilog("before_state.net.weight_ratio:            ${x}",
-         //      ("x", before_state.net.weight_ratio / double(rentbw_frac)));
-         // ilog("before_state.net.assumed_stake_weight:    ${x}", ("x", before_state.net.assumed_stake_weight));
-         // ilog("before_state.net.weight:                  ${x}", ("x", before_state.net.weight));
-
-         // ilog("before_receiver.net:                      ${x}", ("x", before_receiver.net));
-         // ilog("after_receiver.net:                       ${x}", ("x", after_receiver.net));
-         // ilog("after_receiver.net - before_receiver.net: ${x}", ("x", after_receiver.net - before_receiver.net));
-         // // ilog("expected_net:                             ${x}", ("x", expected_net));
-         // ilog("before_payer.liquid - after_payer.liquid: ${x}", ("x", before_payer.liquid - after_payer.liquid));
-         // ilog("max_payment:                              ${x}", ("x", expected_fee));
-         // ilog("expected_net_fee:                         ${x}", ("x", net_fee));
-         // ilog("expected_cpu_fee:                         ${x}", ("x", cpu_fee));
-         // ilog("before_reserve.net:                       ${x}", ("x", before_reserve.net));
-         // ilog("after_reserve.net:                        ${x}", ("x", after_reserve.net));
-         // ilog("before_reserve.cpu:                       ${x}", ("x", before_reserve.cpu));
-         // ilog("after_reserve.cpu:                        ${x}", ("x", after_reserve.cpu));
 
          write_to_csv(before_payer, after_payer, 
                       before_receiver, after_receiver, 
