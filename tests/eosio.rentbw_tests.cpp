@@ -26,17 +26,10 @@
 #define CFG_FILENAME "_model_config.json"
 #define INP_FILENAME "_rentbw_input.csv"
 
-<<<<<<< HEAD
-
-inline constexpr int64_t rentbw_frac = 1'000'000'000'000'000ll;  // 1.0 = 10^15
-inline constexpr int64_t endstate_weight_ratio = 10000000000000ll;     // 0.1 = 10^13
-inline constexpr int64_t stake_weight  = 1000000000000ll;     
-=======
 inline constexpr int64_t rentbw_frac = 1'000'000'000'000'000ll; // 1.0 = 10^15
 inline constexpr int64_t stake_weight = 100'000'000'0000ll;     // 10^12
 
-inline constexpr int64_t endstate_weight_ratio = 1'000'000'000'000'0ll; // 0.1 = 10^13
->>>>>>> 9d9a361bcf42907af70aa640cd48a5f67fb4b846
+inline constexpr int64_t endstate_weight_ratio = 1'000'000'000'000'0ll; // 0.01 = 10^13
 
 struct rentbw_config_resource
 {
@@ -250,11 +243,7 @@ struct rentbw_tester : eosio_system_tester
       config.net.current_weight_ratio = v.get("net").get("current_weight_ratio").get<int64_t>();
       config.net.target_weight_ratio = v.get("net").get("target_weight_ratio").get<int64_t>();
       config.net.assumed_stake_weight = v.get("net").get("assumed_stake_weight").get<int64_t>();
-<<<<<<< HEAD
-      config.net.target_timestamp = control->head_block_time() + fc::days(365);
-=======
       config.net.target_timestamp = control->head_block_time() + fc::days(v.get("net").get("target_timestamp").get<int64_t>());
->>>>>>> 9d9a361bcf42907af70aa640cd48a5f67fb4b846
       config.net.exponent = v.get("net").get("exponent").get<int64_t>();
       config.net.decay_secs = v.get("net").get("decay_secs").get<int64_t>();
       config.net.min_price = asset::from_string(v.get("net").get("min_price").get<string>());
@@ -265,13 +254,8 @@ struct rentbw_tester : eosio_system_tester
       config.cpu.target_weight_ratio = v.get("cpu").get("target_weight_ratio").get<int64_t>();
       ;
       config.cpu.assumed_stake_weight = v.get("cpu").get("assumed_stake_weight").get<int64_t>();
-<<<<<<< HEAD
-      config.cpu.target_timestamp = control->head_block_time() + fc::days(365);
-      config.cpu.exponent =  v.get("cpu").get("exponent").get<int64_t>();
-=======
       config.cpu.target_timestamp = control->head_block_time() + fc::days(v.get("cpu").get("target_timestamp").get<int64_t>());
       config.cpu.exponent = v.get("cpu").get("exponent").get<int64_t>();
->>>>>>> 9d9a361bcf42907af70aa640cd48a5f67fb4b846
       config.cpu.decay_secs = v.get("cpu").get("decay_secs").get<int64_t>();
       config.cpu.min_price = asset::from_string(v.get("cpu").get("min_price").get<string>());
       config.cpu.max_price = asset::from_string(v.get("cpu").get("max_price").get<string>());
