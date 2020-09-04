@@ -1,6 +1,6 @@
 
-if [ $# -ne 3 ]; then
-    echo "Usage: ./build_and_run.sh eosio_system_rentbw_tests/model_tests model_config_foo.json csv_output_foo.csv"
+if [ $# -ne 4 ]; then
+    echo "Usage: ./build_and_run.sh eosio_system_rentbw_tests/model_tests model_config_foo.json rentbw_input.csv csv_output_foo.csv"
     exit 1
 fi
 
@@ -13,6 +13,8 @@ set +e
 popd
 
 cp $2 _model_config.json
+cp $3 _rentbw_input.csv
+
 build/tests/unit_test -t $1
-mv model_tests.csv $3
+mv model_tests.csv $4
 
