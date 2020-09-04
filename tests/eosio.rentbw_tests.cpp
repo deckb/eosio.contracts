@@ -659,6 +659,7 @@ try
       {
          //
       }
+      produce_block();
    }
 }
 FC_LOG_AND_RETHROW()
