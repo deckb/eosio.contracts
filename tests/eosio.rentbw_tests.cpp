@@ -573,16 +573,16 @@ struct rentbw_tester : eosio_system_tester
       auto cpu_util = __int128_t(cpu_frac) * before_state.cpu.weight / rentbw_frac;
       auto cpu_fee = calc_rentbw_fee(before_state.cpu, cpu_util);
       auto fee = calc_both_fees(before_state, net_frac, cpu_frac);
+
       
-      if(fee >= before_state.min_rent_fee) {
-         BOOST_REQUIRE_EQUAL("", rentbw(payer, receiver, days, net_frac, cpu_frac, expected_fee));
-         auto after_payer = get_account_info(payer);
-         auto after_receiver = get_account_info(receiver);
-         auto after_reserve = get_account_info(N(eosio.reserv));
-         auto after_state = get_state();
+      rentbw(payer, receiver, days, net_frac, cpu_frac, expected_fee);
+      auto after_payer = get_account_info(payer);
+      auto after_receiver = get_account_info(receiver);
+      auto after_reserve = get_account_info(N(eosio.reserv));
+      auto after_state = get_state();
          
-         if (GENERATE_CSV)
-         {
+      if (GENERATE_CSV)
+      {
             ilog("net_frac:    ${x}", ("x", net_frac));
             ilog("cpu_frac:    ${x}", ("x", cpu_frac));
 
@@ -591,7 +591,6 @@ struct rentbw_tester : eosio_system_tester
                         before_reserve, after_reserve,
                         before_state, after_state,
                         net_fee, net_frac, cpu_fee, cpu_frac);
-         }
       }
    }
 };
@@ -620,7 +619,7 @@ try
    auto cpu_weight = stake_weight;
 
    start_rex();
-   create_account_with_resources(N(aaaaaaaaaaaa), config::system_account_name, core_sym::from_string("1.0000"),
+   create_account_with_resources(N(aaaaaaaaaaaa), config::system_account_name, core_sym::from_string("10.0000"),
                                  false, core_sym::from_string("500.0000"), core_sym::from_string("500.0000"));
 
    transfer(config::system_account_name, N(aaaaaaaaaaaa), core_sym::from_string("5000000.0000"));
@@ -651,7 +650,7 @@ try
 
          account_name payer_name = string_to_name(payer);
          account_name receiver_name = string_to_name(receiver);
-
+         
          nocheck_rentbw(payer_name, receiver_name,
                       days, net_frac, cpu_frac, asset::from_string(max_payment + " TST"));
       }
