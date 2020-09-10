@@ -248,11 +248,9 @@ struct rentbw_tester : eosio_system_tester
       config.net.decay_secs = v.get("net").get("decay_secs").get<int64_t>();
       config.net.min_price = asset::from_string(v.get("net").get("min_price").get<string>());
       config.net.max_price = asset::from_string(v.get("net").get("max_price").get<string>());
-
       config.cpu.current_weight_ratio = v.get("cpu").get("current_weight_ratio").get<int64_t>();
-      ;
       config.cpu.target_weight_ratio = v.get("cpu").get("target_weight_ratio").get<int64_t>();
-      ;
+      
       config.cpu.assumed_stake_weight = v.get("cpu").get("assumed_stake_weight").get<int64_t>();
       config.cpu.target_timestamp = control->head_block_time() + fc::days(v.get("cpu").get("target_timestamp").get<int64_t>());
       config.cpu.exponent = v.get("cpu").get("exponent").get<int64_t>();
@@ -484,12 +482,23 @@ struct rentbw_tester : eosio_system_tester
       auto before_receiver = get_account_info(receiver);
       auto before_reserve = get_account_info(N(eosio.reserv));
       auto before_state = get_state();
+<<<<<<< HEAD
       // fees
       auto net_util = __int128_t(net_frac) * before_state.net.weight / rentbw_frac;
       auto net_fee = calc_rentbw_fee(before_state.net, net_util);
       auto cpu_util = __int128_t(cpu_frac) * before_state.cpu.weight / rentbw_frac;
       auto cpu_fee = calc_rentbw_fee(before_state.cpu, cpu_util);
       BOOST_REQUIRE_EQUAL("", rentbw(payer, receiver, days, net_frac, cpu_frac, expected_fee));
+=======
+      try {
+         rentbw(payer, receiver, days, net_frac, cpu_frac, expected_fee);
+      }
+      catch (const fc::exception& ex)
+      {
+         edump((ex.to_detail_string()));
+         return;
+      }
+>>>>>>> systemv/rentbw-modeling
       auto after_payer = get_account_info(payer);
       auto after_receiver = get_account_info(receiver);
       auto after_reserve = get_account_info(N(eosio.reserv));
@@ -558,6 +567,9 @@ struct rentbw_tester : eosio_system_tester
       if (time_diff > 500)
       {
          produce_block(fc::milliseconds(time_diff) - fc::milliseconds(500));
+      }
+      else {
+         produce_block();
       }
    }
 
@@ -658,6 +670,7 @@ try
       {
          //
       }
+<<<<<<< HEAD
       produce_block();
    }
 }
@@ -753,6 +766,9 @@ try
       fee = calc_total_fee(curr_state, net_frac, cpu_frac);
       nocheck_rentbw(N(aaaaaaaaaaaa), N(aaaaaaaaaaaa), 30, net_frac, cpu_frac, fee);
       produce_block(fc::days(1) - fc::milliseconds(500));
+=======
+      
+>>>>>>> systemv/rentbw-modeling
    }
    produce_block(fc::days(27) - fc::milliseconds(500));
 
