@@ -641,7 +641,7 @@ try
       if (function == "rentbwexec")
       {
          produce_blocks_date(datetime.c_str());
-         
+         ilog("block_time: ${time}",("time",last_block_time()));
          BOOST_REQUIRE_EQUAL("", rentbwexec(config::system_account_name, queue_max));
       }
       else if (function == "rentbw")
