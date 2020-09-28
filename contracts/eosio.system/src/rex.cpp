@@ -8,6 +8,38 @@ namespace eosiosystem {
    using eosio::token;
    using eosio::seconds;
 
+   void system_contract::deposit2rex(const name& owner, const asset& amount) 
+   {
+      // deposit
+      system_contract::deposit_action deposit_act{ "eosio"_n, { owner, active_permission } };
+      deposit_act.send(owner, amount);
+      // buyrex
+      system_contract::buyrex_action buyrex_act{ "eosio"_n, { owner, active_permission } };
+      buyrex_act.send(owner, amount);
+   }
+
+   void system_contract::withdrwfmrex(const name& owner, const asset& amount) 
+   {
+      require_auth( owner );
+      // get current fund total
+      asset start_fund = asset( 0, core_symbol() );
+      auto itr = _rexfunds.find( owner.value );
+      if( itr != _rexfunds.end() ) {
+         start_fund = itr->balance;
+      }
+      // sellrex
+      system_contract::sellrex_action sellrex_act{ "eosio"_n, { owner, active_permission } };
+      sellrex_act.send( owner, amount );
+      
+      // should find the fund but check it anyway
+      auto end_itr = _rexfunds.require_find( owner.value, "cannot find fund balance" );
+      // only continue if the order was not put in the queue 
+      check( start_fund < end_itr->balance, "Sell order was queued. Please re-submit" );
+      // withdraw the difference between end and start
+      system_contract::withdraw_action withdraw_act{ "eosio"_n, { owner, active_permission } };
+      withdraw_act.send( owner, end_itr->balance - start_fund );
+   }
+
    void system_contract::deposit( const name& owner, const asset& amount )
    {
       require_auth( owner );

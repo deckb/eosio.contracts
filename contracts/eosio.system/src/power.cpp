@@ -1,12 +1,12 @@
 #include <eosio.system/eosio.system.hpp>
 #include <eosio/action.hpp>
-#include <eosio.system/rentbw.results.hpp>
+#include <eosio.system/power.results.hpp>
 #include <algorithm>
 #include <cmath>
 
 namespace eosiosystem {
 
-void update_weight(time_point_sec now, rentbw_state_resource& res, int64_t& delta_available);
+void update_weight(time_point_sec now, power_state_resource& res, int64_t& delta_available);
 
 /**
  *  @pre  now >= res.utilization_timestamp
@@ -14,7 +14,7 @@ void update_weight(time_point_sec now, rentbw_state_resource& res, int64_t& delt
  *  @post if res.utilization < old res.adjusted_utilization, then new res.adjusted_utilization <= old res.adjusted_utilization
  *  @post if res.utilization >= old res.adjusted_utilization, then new res.adjusted_utilization == res.utilization
  */
-void update_utilization(time_point_sec now, rentbw_state_resource& res);
+void update_utilization(time_point_sec now, power_state_resource& res);
 
 void system_contract::adjust_resources(name payer, name account, symbol core_symbol, int64_t net_delta,
                                        int64_t cpu_delta, bool must_not_be_managed) {
@@ -67,8 +67,8 @@ void system_contract::adjust_resources(name payer, name account, symbol core_sym
    }
 } // system_contract::adjust_resources
 
-void system_contract::process_rentbw_queue(time_point_sec now, symbol core_symbol, rentbw_state& state,
-                                           rentbw_order_table& orders, uint32_t max_items, int64_t& net_delta_available,
+void system_contract::process_queue(time_point_sec now, symbol core_symbol, power_state& state,
+                                           power_order_table& orders, uint32_t max_items, int64_t& net_delta_available,
                                            int64_t& cpu_delta_available) {
    update_utilization(now, state.net);
    update_utilization(now, state.cpu);
@@ -88,7 +88,7 @@ void system_contract::process_rentbw_queue(time_point_sec now, symbol core_symbo
    update_weight(now, state.cpu, cpu_delta_available);
 }
 
-void update_weight(time_point_sec now, rentbw_state_resource& res, int64_t& delta_available) {
+void update_weight(time_point_sec now, power_state_resource& res, int64_t& delta_available) {
    if (now >= res.target_timestamp) {
       res.weight_ratio = res.target_weight_ratio;
    } else {
@@ -97,12 +97,12 @@ void update_weight(time_point_sec now, rentbw_state_resource& res, int64_t& delt
                                (now.utc_seconds - res.initial_timestamp.utc_seconds) /
                                (res.target_timestamp.utc_seconds - res.initial_timestamp.utc_seconds);
    }
-   int64_t new_weight    = res.assumed_stake_weight * int128_t(rentbw_frac) / res.weight_ratio - res.assumed_stake_weight;
+   int64_t new_weight    = res.assumed_stake_weight * int128_t(power_frac) / res.weight_ratio - res.assumed_stake_weight;
    delta_available += new_weight - res.weight;
    res.weight = new_weight;
 }
 
-void update_utilization(time_point_sec now, rentbw_state_resource& res) {
+void update_utilization(time_point_sec now, power_state_resource& res) {
    if (now <= res.utilization_timestamp) return;
 
    if (res.utilization >= res.adjusted_utilization) {
@@ -116,11 +116,11 @@ void update_utilization(time_point_sec now, rentbw_state_resource& res) {
    res.utilization_timestamp = now;
 }
 
-void system_contract::configrentbw(rentbw_config& args) {
+void system_contract::configpower(power_config& args) {
    require_auth(get_self());
    time_point_sec         now         = eosio::current_time_point();
    auto                   core_symbol = get_core_symbol();
-   rentbw_state_singleton state_sing{ get_self(), 0 };
+   power_state_singleton state_sing{ get_self(), 0 };
    auto                   state = state_sing.get_or_default();
 
    eosio::check(eosio::is_account(reserv_account), "eosio.reserv account must first be created");
@@ -192,12 +192,12 @@ void system_contract::configrentbw(rentbw_config& args) {
       }
 
       eosio::check(*args.current_weight_ratio > 0, "current_weight_ratio is too small");
-      eosio::check(*args.current_weight_ratio <= rentbw_frac, "current_weight_ratio is too large");
+      eosio::check(*args.current_weight_ratio <= power_frac, "current_weight_ratio is too large");
       eosio::check(*args.target_weight_ratio > 0, "target_weight_ratio is too small");
       eosio::check(*args.target_weight_ratio <= *args.current_weight_ratio, "weight can't grow over time");
       eosio::check(*args.assumed_stake_weight >= 1,
                    "assumed_stake_weight must be at least 1; a much larger value is recommended");
-      eosio::check(*args.assumed_stake_weight * int128_t(rentbw_frac) / *args.target_weight_ratio <=
+      eosio::check(*args.assumed_stake_weight * int128_t(power_frac) / *args.target_weight_ratio <=
                          std::numeric_limits<int64_t>::max(),
                    "assumed_stake_weight/target_weight_ratio is too large");
       eosio::check(*args.exponent >= 1.0, "exponent must be >= 1");
@@ -250,7 +250,7 @@ void system_contract::configrentbw(rentbw_config& args) {
 
    adjust_resources(get_self(), reserv_account, core_symbol, net_delta_available, cpu_delta_available, true);
    state_sing.set(state, get_self());
-} // system_contract::configrentbw
+} // system_contract::configpower
 
 /**
  *  @pre 0 <= state.min_price.amount <= state.max_price.amount
@@ -259,7 +259,7 @@ void system_contract::configrentbw(rentbw_config& args) {
  *  @pre 0 <= state.utilization <= state.adjusted_utilization <= state.weight
  *  @pre 0 <= utilization_increase <= (state.weight - state.utilization)
  */
-int64_t calc_rentbw_fee(const rentbw_state_resource& state, int64_t utilization_increase) {
+int64_t calc_power_fee(const power_state_resource& state, int64_t utilization_increase) {
    if( utilization_increase <= 0 ) return 0;
 
    // Let p(u) = price as a function of the utilization fraction u which is defined for u in [0.0, 1.0].
@@ -314,29 +314,29 @@ int64_t calc_rentbw_fee(const rentbw_state_resource& state, int64_t utilization_
    return std::ceil(fee);
 }
 
-void system_contract::rentbwexec(const name& user, uint16_t max) {
+void system_contract::powerexec(const name& user, uint16_t max) {
    require_auth(user);
-   rentbw_state_singleton state_sing{ get_self(), 0 };
-   rentbw_order_table     orders{ get_self(), 0 };
-   eosio::check(state_sing.exists(), "rentbw hasn't been initialized");
+   power_state_singleton state_sing{ get_self(), 0 };
+   power_order_table     orders{ get_self(), 0 };
+   eosio::check(state_sing.exists(), "power hasn't been initialized");
    auto           state       = state_sing.get();
    time_point_sec now         = eosio::current_time_point();
    auto           core_symbol = get_core_symbol();
 
    int64_t net_delta_available = 0;
    int64_t cpu_delta_available = 0;
-   process_rentbw_queue(now, core_symbol, state, orders, max, net_delta_available, cpu_delta_available);
+   process_queue(now, core_symbol, state, orders, max, net_delta_available, cpu_delta_available);
 
    adjust_resources(get_self(), reserv_account, core_symbol, net_delta_available, cpu_delta_available, true);
    state_sing.set(state, get_self());
 }
 
-void system_contract::rentbw(const name& payer, const name& receiver, uint32_t days, int64_t net_frac, int64_t cpu_frac,
+void system_contract::powerup(const name& payer, const name& receiver, uint32_t days, int64_t net_frac, int64_t cpu_frac,
                              const asset& max_payment) {
    require_auth(payer);
-   rentbw_state_singleton state_sing{ get_self(), 0 };
-   rentbw_order_table     orders{ get_self(), 0 };
-   eosio::check(state_sing.exists(), "rentbw hasn't been initialized");
+   power_state_singleton state_sing{ get_self(), 0 };
+   power_order_table     orders{ get_self(), 0 };
+   eosio::check(state_sing.exists(), "power hasn't been initialized");
    auto           state       = state_sing.get();
    time_point_sec now         = eosio::current_time_point();
    auto           core_symbol = get_core_symbol();
@@ -344,21 +344,21 @@ void system_contract::rentbw(const name& payer, const name& receiver, uint32_t d
    eosio::check(days == state.rent_days, "days doesn't match configuration");
    eosio::check(net_frac >= 0, "net_frac can't be negative");
    eosio::check(cpu_frac >= 0, "cpu_frac can't be negative");
-   eosio::check(net_frac <= rentbw_frac, "net can't be more than 100%");
-   eosio::check(cpu_frac <= rentbw_frac, "cpu can't be more than 100%");
+   eosio::check(net_frac <= power_frac, "net can't be more than 100%");
+   eosio::check(cpu_frac <= power_frac, "cpu can't be more than 100%");
 
    int64_t net_delta_available = 0;
    int64_t cpu_delta_available = 0;
-   process_rentbw_queue(now, core_symbol, state, orders, 2, net_delta_available, cpu_delta_available);
+   process_queue(now, core_symbol, state, orders, 2, net_delta_available, cpu_delta_available);
 
    eosio::asset fee{ 0, core_symbol };
-   auto         process = [&](int64_t frac, int64_t& amount, rentbw_state_resource& state) {
+   auto         process = [&](int64_t frac, int64_t& amount, power_state_resource& state) {
       if (!frac)
          return;
-      amount = int128_t(frac) * state.weight / rentbw_frac;
+      amount = int128_t(frac) * state.weight / power_frac;
       eosio::check(state.weight, "market doesn't have resources available");
       eosio::check(state.utilization + amount <= state.weight, "market doesn't have enough resources available");
-      int64_t f = calc_rentbw_fee(state, amount);
+      int64_t f = calc_power_fee(state, amount);
       eosio::check(f > 0, "calculated fee is below minimum; try renting more");
       fee.amount += f;
       state.utilization += amount;
@@ -391,8 +391,8 @@ void system_contract::rentbw(const name& payer, const name& receiver, uint32_t d
    state_sing.set(state, get_self());
 
    // inline noop action
-   rentbw_results::rentbwresult_action rentbwresult_act{ reserv_account, std::vector<eosio::permission_level>{ } };
-   rentbwresult_act.send( fee, asset{ net_amount, core_symbol }, asset{ cpu_amount, core_symbol } );
+   power_results::powerresult_action powerresult_act{ reserv_account, std::vector<eosio::permission_level>{ } };
+   powerresult_act.send( fee, asset{ net_amount, core_symbol }, asset{ cpu_amount, core_symbol } );
 }
 
 } // namespace eosiosystem
