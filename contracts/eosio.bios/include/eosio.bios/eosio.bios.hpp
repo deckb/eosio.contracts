@@ -7,25 +7,6 @@
 #include <eosio/privileged.hpp>
 #include <eosio/producer_schedule.hpp>
 
-/**
- * EOSIO Contracts
- *
- * The design of the EOSIO blockchain calls for a number of smart contracts that are run at a
- * privileged permission level in order to support functions such as block producer registration and
- * voting, token staking for CPU and network bandwidth, RAM purchasing, multi-sig, etc. These smart
- * contracts are referred to as the system, token, msig and wrap (formerly known as sudo) contracts.
- *
- * This repository contains examples of these privileged contracts that are useful when deploying,
- * managing, and/or using an EOSIO blockchain. They are provided for reference purposes:
- * - eosio.bios
- * - eosio.system
- * - eosio.msig
- * - eosio.wrap
- *
- * The following unprivileged contract(s) are also part of the system.
- * - eosio.token
- */
-
 namespace eosiobios {
 
    using eosio::action_wrapper;
@@ -186,8 +167,6 @@ namespace eosiobios {
           */
          [[eosio::action]]
          void setcode( name account, uint8_t vmtype, uint8_t vmversion, const std::vector<char>& code ) {}
-
-         /** @}*/
 
          /**
           * Set abi action sets the abi for contract identified by `account` name. Creates an entry in the abi_hash_table

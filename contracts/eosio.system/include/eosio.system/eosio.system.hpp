@@ -80,6 +80,7 @@ namespace eosiosystem {
    static constexpr int64_t  default_inflation_pay_factor  = 50000;   // producers pay share = 10000 / 50000 = 20% of the inflation
    static constexpr int64_t  default_votepay_factor        = 40000;   // per-block pay share = 10000 / 40000 = 25% of the producer pay
 
+<<<<<<< HEAD
    /**
     * eosio.system contract
     * 
@@ -93,6 +94,22 @@ namespace eosiosystem {
     *    and users to rent CPU and Network resources in return for a market-determined fee.
     */
 
+=======
+  /**
+   * The `eosio.system` smart contract is provided by `block.one` as a sample system contract, and it defines the structures and actions needed for blockchain's core functionality.
+   * 
+   * Just like in the `eosio.bios` sample contract implementation, there are a few actions which are not implemented at the contract level (`newaccount`, `updateauth`, `deleteauth`, `linkauth`, `unlinkauth`, `canceldelay`, `onerror`, `setabi`, `setcode`), they are just declared in the contract so they will show in the contract's ABI and users will be able to push those actions to the chain via the account holding the `eosio.system` contract, but the implementation is at the EOSIO core level. They are referred to as EOSIO native actions.
+   * 
+   * - Users can stake tokens for CPU and Network bandwidth, and then vote for producers or
+   *    delegate their vote to a proxy.
+   * - Producers register in order to be voted for, and can claim per-block and per-vote rewards.
+   * - Users can buy and sell RAM at a market-determined price.
+   * - Users can bid on premium names.
+   * - A resource exchange system (REX) allows token holders to lend their tokens,
+   *    and users to rent CPU and Network resources in return for a market-determined fee.
+   */
+  
+>>>>>>> eosio/rentbw-modeling
    // A name bid, which consists of:
    // - a `newname` name that the bid is for
    // - a `high_bidder` account name that is the one with the highest bid so far
@@ -643,7 +660,6 @@ namespace eosiosystem {
                                indexed_by<"byowner"_n, const_mem_fun<rentbw_order, uint64_t, &rentbw_order::by_owner>>,
                                indexed_by<"byexpires"_n, const_mem_fun<rentbw_order, uint64_t, &rentbw_order::by_expires>>
                                > rentbw_order_table;
-
 
    /**
     * The `eosio.system` smart contract is provided by `block.one` as a sample system contract, and it defines the structures and actions needed for blockchain's core functionality.
