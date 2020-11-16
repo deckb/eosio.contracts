@@ -379,6 +379,7 @@ void system_contract::powerup(const name& payer, const name& receiver, uint32_t 
       eosio::check(f > 0, "calculated fee is below minimum; try renting more");
       fee.amount += f;
       state.utilization += amount;
+      state.fee = f;
    };
 
    int64_t net_amount = 0;
