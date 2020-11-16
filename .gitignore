@@ -34,5 +34,5 @@
 build/*
 **/.DS_Store
 **/.vscode
+!modeling/examples/*.csv
 *.csv
-!modeling/examples/*.cvs
