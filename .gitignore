@@ -32,13 +32,7 @@
 *.app
 
 build/*
-<<<<<<< HEAD
-.DS_Store
-
-.vscode
-=======
 **/.DS_Store
 **/.vscode
 *.csv
 !modeling/examples/*.cvs
->>>>>>> eosio/rentbw-modeling
