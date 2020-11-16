@@ -14,20 +14,20 @@ using eosio::name;
  * This inline convenience action does not have any effect, however,
  * its data includes the result of the parent action and appears in its trace.
  */
-class [[eosio::contract("power.results")]] power_results : eosio::contract {
+class [[eosio::contract("powup.results")]] powup_results : eosio::contract {
    public:
 
       using eosio::contract::contract;
 
       /**
-       * powerresult action.
+       * powupresult action.
        *
        * @param fee        - rental fee amount
-       * @param rented_net - amount of rented NET tokens
-       * @param rented_cpu - amount of rented CPU tokens
+       * @param powup_net - amount of powup NET tokens
+       * @param powup_cpu - amount of powup CPU tokens
        */
       [[eosio::action]]
-      void powerresult( const asset& fee, const asset& rented_net, const asset& rented_cpu );
+      void powupresult( const asset& fee, const asset& powup_net, const asset& powup_cpu );
 
-      using powerresult_action  = action_wrapper<"powerresult"_n,  &power_results::powerresult>;
+      using powupresult_action  = action_wrapper<"powupresult"_n,  &powup_results::powupresult>;
 };

@@ -40,7 +40,7 @@ namespace eosiosystem {
    using eosio::time_point_sec;
    using eosio::unsigned_int;
 
-   inline constexpr int64_t power_frac = 1'000'000'000'000'000ll;  // 1.0 = 10^15
+   inline constexpr int64_t powerup_frac = 1'000'000'000'000'000ll;  // 1.0 = 10^15
 
    template<typename E, typename F>
    static inline auto has_field( F flags, E field )
@@ -525,7 +525,7 @@ namespace eosiosystem {
       asset stake_change;
    };
 
-   struct power_config_resource {
+   struct powerup_config_resource {
       std::optional<int64_t>        current_weight_ratio;   // Immediately set weight_ratio to this amount. 1x = 10^15. 0.01x = 10^13.
                                                             //    Do not specify to preserve the existing setting or use the default;
                                                             //    this avoids sudden price jumps. For new chains which don't need
@@ -558,22 +558,22 @@ namespace eosiosystem {
                                                             //    token supply. Do not specify to preserve the existing
                                                             //    setting (no default exists).
 
-      EOSLIB_SERIALIZE( power_config_resource, (current_weight_ratio)(target_weight_ratio)(assumed_stake_weight)
+      EOSLIB_SERIALIZE( powerup_config_resource, (current_weight_ratio)(target_weight_ratio)(assumed_stake_weight)
                                                 (target_timestamp)(exponent)(decay_secs)(min_price)(max_price)    )
    };
 
-   struct power_config {
-      power_config_resource  net;           // NET market configuration
-      power_config_resource  cpu;           // CPU market configuration
-      std::optional<uint32_t> rent_days;     // `power` `days` argument must match this. Do not specify to preserve the
+   struct powerup_config {
+      powerup_config_resource  net;           // NET market configuration
+      powerup_config_resource  cpu;           // CPU market configuration
+      std::optional<uint32_t> powerup_days;     // `power` `days` argument must match this. Do not specify to preserve the
                                              //    existing setting or use the default.
-      std::optional<asset>    min_rent_fee;  // Rental fees below this amount are rejected. Do not specify to preserve the
+      std::optional<asset>    min_powerup_fee;  // Rental fees below this amount are rejected. Do not specify to preserve the
                                              //    existing setting (no default exists).
 
-      EOSLIB_SERIALIZE( power_config, (net)(cpu)(rent_days)(min_rent_fee) )
+      EOSLIB_SERIALIZE( powerup_config, (net)(cpu)(powerup_days)(min_powerup_fee) )
    };
 
-   struct power_state_resource {
+   struct powerup_state_resource {
       static constexpr double   default_exponent   = 2.0;                  // Exponent of 2.0 means that the price to rent a
                                                                            //    tiny amount of resources increases linearly
                                                                            //    with utilization.
@@ -591,8 +591,8 @@ namespace eosiosystem {
                                                                    //    assumed_stake_weight / (assumed_stake_weight + weight).
                                                                    //    calculated; varies over time. 1x = 10^15. 0.01x = 10^13.
       int64_t        assumed_stake_weight    = 0;                  // Assumed stake weight for ratio calculations.
-      int64_t        initial_weight_ratio    = power_frac;        // Initial weight_ratio used for linear shrinkage.
-      int64_t        target_weight_ratio     = power_frac / 100;  // Linearly shrink the weight_ratio to this amount.
+      int64_t        initial_weight_ratio    = powerup_frac;        // Initial weight_ratio used for linear shrinkage.
+      int64_t        target_weight_ratio     = powerup_frac / 100;  // Linearly shrink the weight_ratio to this amount.
       time_point_sec initial_timestamp       = {};                 // When weight_ratio shrinkage started
       time_point_sec target_timestamp        = {};                 // Stop automatic weight_ratio shrinkage at this time. Once this
                                                                    //    time hits, weight_ratio will be target_weight_ratio.
@@ -610,21 +610,21 @@ namespace eosiosystem {
       time_point_sec utilization_timestamp   = {};                 // When adjusted_utilization was last updated
    };
 
-   struct [[eosio::table("power.state"),eosio::contract("eosio.system")]] power_state {
-      static constexpr uint32_t default_rent_days = 30; // 30 day resource rentals
+   struct [[eosio::table("powup.state"),eosio::contract("eosio.system")]] powerup_state {
+      static constexpr uint32_t default_powerup_days = 30; // 30 day resource powerups
 
-      uint8_t                 version      = 0;
-      power_state_resource   net          = {};                 // NET market state
-      power_state_resource   cpu          = {};                 // CPU market state
-      uint32_t                rent_days    = default_rent_days;  // `power` `days` argument must match this.
-      asset                   min_rent_fee = {};                 // Rental fees below this amount are rejected
+      uint8_t                    version           = 0;
+      powerup_state_resource     net               = {};                     // NET market state
+      powerup_state_resource     cpu               = {};                     // CPU market state
+      uint32_t                   powerup_days      = default_powerup_days;   // `powerup` `days` argument must match this.
+      asset                      min_powerup_fee   = {};                     // fees below this amount are rejected
 
       uint64_t primary_key()const { return 0; }
    };
 
-   typedef eosio::singleton<"power.state"_n, power_state> power_state_singleton;
+   typedef eosio::singleton<"powup.state"_n, powerup_state> powerup_state_singleton;
 
-   struct [[eosio::table("power.order"),eosio::contract("eosio.system")]] power_order {
+   struct [[eosio::table("powup.order"),eosio::contract("eosio.system")]] powerup_order {
       uint8_t              version = 0;
       uint64_t             id;
       name                 owner;
@@ -637,10 +637,10 @@ namespace eosiosystem {
       uint64_t by_expires()const  { return expires.utc_seconds; }
    };
 
-   typedef eosio::multi_index< "power.order"_n, power_order,
-                               indexed_by<"byowner"_n, const_mem_fun<power_order, uint64_t, &power_order::by_owner>>,
-                               indexed_by<"byexpires"_n, const_mem_fun<power_order, uint64_t, &power_order::by_expires>>
-                               > power_order_table;
+   typedef eosio::multi_index< "powup.order"_n, powerup_order,
+                               indexed_by<"byowner"_n, const_mem_fun<powerup_order, uint64_t, &powerup_order::by_owner>>,
+                               indexed_by<"byexpires"_n, const_mem_fun<powerup_order, uint64_t, &powerup_order::by_expires>>
+                               > powerup_order_table;
 
    /**
     * eosio.system contract defines the structures and actions needed for blockchain's core functionality.
@@ -1306,7 +1306,7 @@ namespace eosiosystem {
           * action is invoked.
           */
          [[eosio::action]]
-         void configpower( power_config& args );
+         void cfgpowerup( powerup_config& args );
 
          /**
           * Process power queue and update state. Action does not execute anything related to a specific user.
@@ -1315,10 +1315,10 @@ namespace eosiosystem {
           * @param max - number of queue items to process
           */
          [[eosio::action]]
-         void powerexec( const name& user, uint16_t max );
+         void powerupexec( const name& user, uint16_t max );
 
          /**
-          * Rent NET and CPU
+          * Rent NET and CPU by percentage
           *
           * @param payer - the resource buyer
           * @param receiver - the resource receiver
@@ -1379,8 +1379,8 @@ namespace eosiosystem {
          using setalimits_action = eosio::action_wrapper<"setalimits"_n, &system_contract::setalimits>;
          using setparams_action = eosio::action_wrapper<"setparams"_n, &system_contract::setparams>;
          using setinflation_action = eosio::action_wrapper<"setinflation"_n, &system_contract::setinflation>;
-         using configpower_action = eosio::action_wrapper<"configpower"_n, &system_contract::configpower>;
-         using powerexec_action = eosio::action_wrapper<"powerexec"_n, &system_contract::powerexec>;
+         using cfgpowerup_action = eosio::action_wrapper<"cfgpowerup"_n, &system_contract::cfgpowerup>;
+         using powerupexec_action = eosio::action_wrapper<"powerupexec"_n, &system_contract::powerupexec>;
          using powerup_action = eosio::action_wrapper<"powerup"_n, &system_contract::powerup>;
 
       private:
@@ -1486,8 +1486,8 @@ namespace eosiosystem {
          // defined in power.cpp
          void adjust_resources(name payer, name account, symbol core_symbol, int64_t net_delta, int64_t cpu_delta, bool must_not_be_managed = false);
          void process_queue(
-            time_point_sec now, symbol core_symbol, power_state& state,
-            power_order_table& orders, uint32_t max_items, int64_t& net_delta_available,
+            time_point_sec now, symbol core_symbol, powerup_state& state,
+            powerup_order_table& orders, uint32_t max_items, int64_t& net_delta_available,
             int64_t& cpu_delta_available);
    };
 
