@@ -111,7 +111,7 @@ struct powerup_state {
 ### Preparation for Upgrade
 1. Build [eosio.contracts](https://github.com/EOSIO/eosio.contracts) with `powerup` code. Version **1.9.2** or greater .
 2. Deploy eosio.system contract to `eosio`.
-3. Create account `eosio.reserv` and ensure the account has enough RAM.
+3. Create account `eosio.reserv` and ensure the account has enough at least 4 KiB of RAM.
 4. Deploy `powup.results.abi` to `eosio.reserv` account using `setabi`. The ABI can be found in the `build/contracts/eosio.system/.powerup/` directory.
 5. Enable the REX system (if not enabled).
 
@@ -220,7 +220,7 @@ You can see how many tokens were received for `NET` and `CPU` as well as the fee
 
 #### Clearing the orders queue
 
-There is an action `powerupexec` that takes a `name` of a user and the `max` number of orders that will be cleared if expired. The orders table `powup.order` can be viewed by calling:
+The orders table `powup.order` can be viewed by calling:
 ```
 cleos get table eosio 0 powup.order
 {
@@ -238,3 +238,11 @@ cleos get table eosio 0 powup.order
 }
 ```
 
+The action `powerupexec` that takes a `name` of a user and the `max` number of orders that will be cleared if expired. It is worth noting that the call to `powerup` will also clear up to two expired orders per call.
+
+```
+cleos push action eosio powerupexec '[user, 2]' -p user
+executed transaction: 93ab4ac900a7902e4e59e5e925e8b54622715328965150db10774aa09855dc98  104 bytes  363 us
+#         eosio <= eosio::powerupexec           {"user":"user","max":2}
+warning: transaction executed locally, but may not be confirmed by the network yet         ]
+```
