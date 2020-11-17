@@ -252,25 +252,6 @@ void system_contract::cfgpowerup(powerup_config& args) {
    state_sing.set(state, get_self());
 } // system_contract::configpower
 
-int64_t calc_powerup_increase(const powerup_state_resource& state, asset price) {
-   int64_t start_utilization = state.utilization;
-
-   int64_t increase_util = 0;
-   
-   if (start_utilization == state.adjusted_utilization) {
-      // (d / (c-b)) + a^d ) ]
-      auto price_diff = state.max_price.amount - state.min_price.amount;
-      auto val = (((state.exponent * price.amount) / price_diff) + std::pow(double(state.adjusted_utilization), state.exponent));
-      eosio::print("values ", state.exponent, " ", price.amount, " ", price_diff, " ", state.adjusted_utilization, " ", val,"\n");
-      increase_util += std::pow(val, 1/state.exponent) - state.adjusted_utilization;
-   }
-   else {
-      eosio::check(false, "start_util != adjusted_util");
-   }
-   eosio::print("hello, ", increase_util, "\n");
-   return increase_util;
-} // calc_powerup_increase
-
 /**
  *  @pre 0 <= state.min_price.amount <= state.max_price.amount
  *  @pre 0 < state.max_price.amount
